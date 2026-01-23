@@ -43,57 +43,66 @@ public class ProductController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    @GetMapping
+    /**
+     * Lista todos los productos SIN paginación (usar solo para testing)
+     * Ejemplo: GET /api/products/all
+     */
+    @GetMapping("/all")
     public ResponseEntity<List<ProductResponseDto>> findAll() {
         List<ProductResponseDto> products = productService.findAll();
         return ResponseEntity.ok(products);
     }
 
-    @GetMapping("/paginated")
+    /**
+     * Lista todos los productos CON paginación (RECOMENDADO)
+     * Ejemplo: GET /api/products?page=0&size=10&sort=name,asc
+     */
+    @GetMapping
     public ResponseEntity<Page<ProductResponseDto>> findAllPaginated(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "id") String[] sort) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "sort", defaultValue = "id,asc") String sort) {
 
-        Page<ProductResponseDto> products = productService.findAllPaginated(page, size, sort);
+        Page<ProductResponseDto> products = productService.findAllPaginated(page, size, new String[]{sort});
         return ResponseEntity.ok(products);
     }
 
 
-        // ============== PAGINACIÓN CON SLICE (PERFORMANCE) ==============
+    // ============== PAGINACIÓN CON SLICE (PERFORMANCE) ==============
 
     /**
-     * Lista productos usando Slice para mejor performance
-     * Ejemplo: GET /api/products/slice?page=0&size=10&sort=createdAt,desc
+     * Lista productos usando Slice para mejor performance (no calcula total)
+     * Ideal para infinite scroll o cuando no necesitas el total de páginas
+     * Ejemplo: GET /api/products/slice?page=0&size=10
      */
     @GetMapping("/slice")
     public ResponseEntity<Slice<ProductResponseDto>> findAllSlice(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "id") String[] sort) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "sort", defaultValue = "id,asc") String sort) {
 
-        Slice<ProductResponseDto> products = productService.findAllSlice(page, size, sort);
+        Slice<ProductResponseDto> products = productService.findAllSlice(page, size, new String[]{sort});
         return ResponseEntity.ok(products);
     }
 
-    // ============== PAGINACIÓN CON FILTROS (CONTINUANDO TEMA 09) ==============
 
     /**
-     * Lista productos con filtros y paginación
-     * Ejemplo: GET /api/products/search?name=laptop&minPrice=500&page=0&size=5
+     * Busca productos con filtros opcionales y paginación
+     * Ejemplo: GET /api/products/search?name=laptop&minPrice=500&page=0&size=5&sort=price,asc
      */
     @GetMapping("/search")
     public ResponseEntity<Page<ProductResponseDto>> findWithFilters(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) Double minPrice,
-            @RequestParam(required = false) Double maxPrice,
-            @RequestParam(required = false) Long categoryId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt") String[] sort) {
+            @RequestParam(name = "name", required = false) String name,
+            @RequestParam(name = "minPrice", required = false) Double minPrice,
+            @RequestParam(name = "maxPrice", required = false) Double maxPrice,
+            @RequestParam(name = "categoryId", required = false) Long categoryId,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "sort", defaultValue = "createdAt,desc") String sort) {
+
 
         Page<ProductResponseDto> products = productService.findWithFilters(
-            name, minPrice, maxPrice, categoryId, page, size, sort);
+            name, minPrice, maxPrice, categoryId, page, size, new String[]{sort});
         
         return ResponseEntity.ok(products);
     }
@@ -106,9 +115,34 @@ public class ProductController {
         return ResponseEntity.ok(product);
     }
 
-    @GetMapping("/user/{userId}")
+    /**
+     * Lista productos de un usuario específico SIN paginación
+     * Ejemplo: GET /api/products/user/1/all
+     */
+    @GetMapping("/user/{userId}/all")
     public ResponseEntity<List<ProductResponseDto>> findByUserId(@PathVariable("userId") Long userId) {
         List<ProductResponseDto> products = productService.findByUserId(userId);
+        return ResponseEntity.ok(products);
+    }
+
+    /**
+     * Lista productos de un usuario específico CON paginación
+     * Ejemplo: GET /api/products/user/1?page=0&size=5&sort=price,desc
+     */
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<Page<ProductResponseDto>> findByUserIdPaginated(
+            @PathVariable("userId") Long userId,
+            @RequestParam(name = "name", required = false) String name,
+            @RequestParam(name = "minPrice", required = false) Double minPrice,
+            @RequestParam(name = "maxPrice", required = false) Double maxPrice,
+            @RequestParam(name = "categoryId", required = false) Long categoryId,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "sort", defaultValue = "createdAt,desc") String sort) {
+        
+        Page<ProductResponseDto> products = productService.findByUserIdWithFilters(
+            userId, name, minPrice, maxPrice, categoryId, page, size, new String[]{sort});
+        
         return ResponseEntity.ok(products);
     }
 

@@ -19,7 +19,14 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
 
         Optional<ProductEntity> findByName(String name);
 
-        List<ProductEntity> findByOwnerId(Long userId);
+        /**
+         * Busca productos de un usuario específico con categorías cargadas
+         * Usa FETCH JOIN para evitar LazyInitializationException
+         */
+        @Query("SELECT DISTINCT p FROM ProductEntity p " +
+               "LEFT JOIN FETCH p.categories " +
+               "WHERE p.owner.id = :userId")
+        List<ProductEntity> findByOwnerId(@Param("userId") Long userId);
 
         // List<ProductEntity> findByCategoryId(Long categoryId);
 
@@ -54,11 +61,12 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
         /**
          * Consulta personalizada: productos de un usuario con filtros opcionales
          * Permite filtrar por nombre, precio mínimo/máximo y categoría
+         * Usa FETCH para cargar categorías y evitar LazyInitializationException
          */
         @Query("SELECT DISTINCT p FROM ProductEntity p " +
-                        "LEFT JOIN p.categories c " +
+                        "LEFT JOIN FETCH p.categories c " +
                         "WHERE p.owner.id = :userId " +
-                        "AND (COALESCE(:name, '') = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
+                        "AND (:name IS NULL OR :name = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
                         "AND (:minPrice IS NULL OR p.price >= :minPrice) " +
                         "AND (:maxPrice IS NULL OR p.price <= :maxPrice) " +
                         "AND (:categoryId IS NULL OR c.id = :categoryId)")
@@ -98,10 +106,10 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
      * Busca productos con filtros opcionales y paginación
      * Todos los parámetros son opcionales excepto el Pageable
      */
-    @Query("SELECT p FROM ProductEntity p " +
+    @Query("SELECT DISTINCT p FROM ProductEntity p " +
            "JOIN p.owner o " +
-           "JOIN p.categories c " +
-           "WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
+           "LEFT JOIN p.categories c " +
+           "WHERE (:name IS NULL OR :name = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
            "AND (:minPrice IS NULL OR p.price >= :minPrice) " +
            "AND (:maxPrice IS NULL OR p.price <= :maxPrice) " +
            "AND (:categoryId IS NULL OR c.id = :categoryId)")
@@ -116,11 +124,11 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
     /**
      * Busca productos de un usuario con filtros opcionales y paginación
      */
-    @Query("SELECT p FROM ProductEntity p " +
+    @Query("SELECT DISTINCT p FROM ProductEntity p " +
            "JOIN p.owner o " +
            "LEFT JOIN p.categories c " +
            "WHERE o.id = :userId " +
-           "AND (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
+           "AND (:name IS NULL OR :name = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
            "AND (:minPrice IS NULL OR p.price >= :minPrice) " +
            "AND (:maxPrice IS NULL OR p.price <= :maxPrice) " +
            "AND (:categoryId IS NULL OR c.id = :categoryId)")
@@ -151,10 +159,10 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
     /**
      * Cuenta productos con filtros (útil para estadísticas)
      */
-    @Query("SELECT COUNT(p) FROM ProductEntity p " +
+    @Query("SELECT COUNT(DISTINCT p) FROM ProductEntity p " +
            "JOIN p.owner o " +
-           "JOIN p.categories c " +
-           "WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
+           "LEFT JOIN p.categories c " +
+           "WHERE (:name IS NULL OR :name = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
            "AND (:minPrice IS NULL OR p.price >= :minPrice) " +
            "AND (:maxPrice IS NULL OR p.price <= :maxPrice) " +
            "AND (:categoryId IS NULL OR c.id = :categoryId)")

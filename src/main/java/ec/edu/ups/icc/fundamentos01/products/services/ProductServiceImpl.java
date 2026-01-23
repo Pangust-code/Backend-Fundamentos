@@ -161,16 +161,23 @@ public class ProductServiceImpl implements ProductService {
         ProductResponseDto.UserSummaryDto ownerDto = new ProductResponseDto.UserSummaryDto();
         ownerDto.id = entity.getOwner().getId();
         ownerDto.name = entity.getOwner().getName();
+        ownerDto.email = entity.getOwner().getEmail();
 
         List<CategoryResponseDto> categoryDtos = new ArrayList<>();
         for (CategoryEntity categoryEntity : entity.getCategories()) {
             CategoryResponseDto categoryDto = new CategoryResponseDto();
             categoryDto.id = categoryEntity.getId();
             categoryDto.name = categoryEntity.getName();
+            categoryDto.description = categoryEntity.getDescription();
             categoryDtos.add(categoryDto);
         }
         dto.user = ownerDto;
         dto.categories = categoryDtos;
+        
+        // Mapear campos de auditoría
+        dto.createdAt = entity.getCreatedAt();
+        dto.updatedAt = entity.getUpdatedAt();
+        
         return dto;
 
     }

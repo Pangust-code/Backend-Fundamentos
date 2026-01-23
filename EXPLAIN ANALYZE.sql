@@ -1,0 +1,3 @@
+EXPLAIN ANALYZE 
+SELECT * FROM products WHERE name LIKE '%laptop%' 
+ORDER BY price DESC LIMIT 5 OFFSET 10;

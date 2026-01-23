@@ -34,6 +34,9 @@ except Exception as e:
     exit()
 
 def get_now():
+    """Retorna el timestamp actual.
+    Nota: Spring Boot usa @PrePersist para created_at automáticamente,
+    pero este seeder los establece manualmente para control total."""
     return datetime.now()
 
 # ================= 1. GENERAR USUARIOS =================
@@ -50,11 +53,15 @@ def seed_users():
         VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;
     """
 
-    for _ in range(NUM_USERS):
+    for i in range(NUM_USERS):
         try:
+            # Nombre secuencial: usuario-1, usuario-2, etc.
+            name = f"usuario-{i + 1}"
+            email = f"usuario{i + 1}@example.com"
+            
             cur.execute(sql, (
-                fake.name(), 
-                fake.unique.email(), 
+                name, 
+                email, 
                 hashed_pw, 
                 get_now(), 
                 None,  # updated_at nulo al inicio
@@ -63,7 +70,7 @@ def seed_users():
             ids.append(cur.fetchone()[0])
         except Exception as e:
             conn.rollback()
-            print(f"   ⚠️ Saltando usuario duplicado o error: {e}")
+            # Es normal que algunos usuarios fallen por email duplicado
 
     conn.commit()
     return ids
@@ -78,22 +85,23 @@ def seed_categories():
         VALUES (%s, %s, %s, %s, %s) RETURNING id;
     """
 
-    for _ in range(NUM_CATEGORIES):
+    for i in range(NUM_CATEGORIES):
         try:
-            name = fake.unique.job()
-            if len(name) > 120: name = name[:120]
+            # Nombre secuencial: categoria-1, categoria-2, etc.
+            name = f"categoria-{i + 1}"
+            description = f"Descripción de la categoría {i + 1}"
             
             cur.execute(sql, (
                 name, 
-                fake.sentence(nb_words=10), 
+                description, 
                 get_now(), 
                 None, 
                 False
             ))
             ids.append(cur.fetchone()[0])
         except Exception as e:
-            conn.rollback() 
-            # Es normal que falle si Faker repite un nombre 'unique'
+            conn.rollback()
+            # Error al insertar categoría
 
     conn.commit()
     return ids
@@ -106,6 +114,29 @@ def seed_products(user_ids, category_ids):
         print("❌ Faltan usuarios o categorías. Abortando.")
         return
 
+    # Listas de nombres realistas para generar productos variados
+    product_types = [
+        "Laptop", "Mouse", "Teclado", "Monitor", "Auriculares", "Webcam", 
+        "Micrófono", "Tablet", "Smartphone", "Smartwatch", "Cargador",
+        "Cable USB", "Hub USB", "Disco Duro", "SSD", "Memoria RAM",
+        "Tarjeta Gráfica", "Procesador", "Placa Base", "Fuente de Poder",
+        "Gabinete", "Cooler", "Pasta Térmica", "Adaptador", "Router",
+        "Switch", "Access Point", "Impresora", "Scanner", "Proyector"
+    ]
+    
+    brands = [
+        "Dell", "HP", "Lenovo", "Asus", "Acer", "MSI", "Razer", "Logitech",
+        "Corsair", "Kingston", "Samsung", "LG", "Sony", "Apple", "Xiaomi",
+        "Huawei", "Motorola", "Nokia", "Canon", "Epson", "Brother",
+        "TP-Link", "Netgear", "D-Link", "Cisco", "Intel", "AMD", "Nvidia"
+    ]
+    
+    adjectives = [
+        "Pro", "Gaming", "Premium", "Ultra", "Deluxe", "Plus", "Max",
+        "Elite", "Advanced", "Professional", "Wireless", "RGB", "Mecánico",
+        "Ergonómico", "Portátil", "Compacto", "HD", "4K", "Bluetooth"
+    ]
+
     sql_product = """
         INSERT INTO products (name, price, description, user_id, created_at, updated_at, deleted) 
         VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id;
@@ -117,17 +148,28 @@ def seed_products(user_ids, category_ids):
 
     for i in range(NUM_PRODUCTS):
         try:
-            # Datos aleatorios
+            # Datos aleatorios para owner y precio
             owner_id = random.choice(user_ids)
             price = round(random.uniform(10.0, 5000.0), 2)
-            # Opción A: Nombre estilo frase corta (ej: "Mesa de madera")
-            name = fake.sentence(nb_words=3).replace(".", "")
+            
+            # Generar nombre realista y variado
+            product_type = random.choice(product_types)
+            brand = random.choice(brands)
+            adjective = random.choice(adjectives) if random.random() > 0.3 else ""
+            
+            # Combinaciones realistas
+            if adjective:
+                name = f"{product_type} {brand} {adjective} {i+1}"
+            else:
+                name = f"{product_type} {brand} {i+1}"
+            
+            description = f"{product_type} de alta calidad marca {brand}. Ideal para uso profesional y gaming."
             
             # Insertar Producto
             cur.execute(sql_product, (
                 name, 
                 price, 
-                fake.paragraph(nb_sentences=2), 
+                description, 
                 owner_id, 
                 get_now(), 
                 None, 
@@ -141,8 +183,8 @@ def seed_products(user_ids, category_ids):
             for cat_id in cats_for_prod:
                 cur.execute(sql_relation, (product_id, cat_id))
             
-            # Progreso visual simple cada 100
-            if i % 100 == 0: print(f"   ... {i} productos insertados")
+            # Progreso visual cada 100 productos
+            if (i + 1) % 100 == 0: print(f"   ... {i + 1}/{NUM_PRODUCTS} productos insertados")
             
         except Exception as e:
             conn.rollback()

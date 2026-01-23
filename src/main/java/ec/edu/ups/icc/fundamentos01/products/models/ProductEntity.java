@@ -12,13 +12,13 @@ import jakarta.persistence.*;
 @Table(name = "products")
 public class ProductEntity extends BaseModel {
 
-    @Column(nullable = false, length = 150)
+    @Column(nullable = false, length = 150, columnDefinition = "VARCHAR(150)")
     private String name;
 
     @Column(nullable = false)
     private Double price;
 
-    @Column(length = 500)
+    @Column(length = 500, columnDefinition = "VARCHAR(500)")
     private String description;
     // ================== RELACIONES 1:N ==================
 

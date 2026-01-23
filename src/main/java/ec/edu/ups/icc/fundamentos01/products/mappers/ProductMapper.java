@@ -27,9 +27,9 @@ public class ProductMapper {
         dto.price = product.getPrice();
         dto.description = product.getDescription();
 
-        // dto.user = new ProductResponseDto.UserSummaryDto();
-        // dto.user.id = product.getOwner().getId();
-        // dto.user.username = product.getOwner().getUsername();
+        //dto.user = new ProductResponseDto.UserSummaryDto();
+        //dto.user.id = product.getOwner().getId();
+        //dto.user.username = product.getOwner().getUsername();
 
         return dto;
     }
