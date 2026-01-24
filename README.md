@@ -76,3 +76,12 @@ Ejecutar y documentar las siguientes consultas:
 - [ ] Búsquedas que arrojen pocos resultados vs. muchos resultados.
 - [ ] Orden
 ![alt text](assets/{4442389B-F0C3-4993-BFEF-332B4A103C9C}.png)
+
+# 10. Subir comiit de us poreycto con captura en readme del consumo de 
+
+- *login*
+![alt text](assets/{0101D069-848B-4BE7-A756-0FE41B9EAEFD}.png)
+- *register*
+![alt text](assets/{4563A927-A8EE-489E-8A7C-CEF319164631}.png)
+- *api/users SIN TOKEN*
+![alt text](assets/{683D800E-4D49-48C7-BF08-B376EC819AC9}.png)
