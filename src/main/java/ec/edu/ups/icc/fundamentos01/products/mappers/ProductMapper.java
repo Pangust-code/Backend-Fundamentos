@@ -4,6 +4,7 @@ import ec.edu.ups.icc.fundamentos01.products.dtos.CreateProductDto;
 import ec.edu.ups.icc.fundamentos01.products.dtos.UpdateProductDto;
 import ec.edu.ups.icc.fundamentos01.products.dtos.ProductResponseDto;
 import ec.edu.ups.icc.fundamentos01.products.models.Product;
+import ec.edu.ups.icc.fundamentos01.products.models.ProductEntity;
 
 public class ProductMapper {
 
@@ -31,6 +32,15 @@ public class ProductMapper {
         //dto.user.id = product.getOwner().getId();
         //dto.user.username = product.getOwner().getUsername();
 
+        return dto;
+    }
+
+    public static ProductResponseDto toDto(ProductEntity updated) {
+        ProductResponseDto dto = new ProductResponseDto();
+        dto.id = updated.getId();
+        dto.name = updated.getName();
+        dto.price = updated.getPrice();
+        dto.description = updated.getDescription();
         return dto;
     }
 }

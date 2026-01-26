@@ -6,6 +6,9 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -57,6 +60,71 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .badRequest()
+                .body(response);
+    }
+
+    // ============== EXCEPCIONES DE SEGURIDAD ==============
+
+    /**
+     * Maneja AuthorizationDeniedException (Spring Security 6.x)
+     * Se lanza cuando un usuario autenticado no tiene los permisos necesarios
+     * 
+     * Contexto: Ocurre cuando @PreAuthorize evalúa a false
+     * Ejemplo: Usuario con ROLE_USER intenta acceder a endpoint con hasRole('ADMIN')
+     */
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAuthorizationDeniedException(
+            AuthorizationDeniedException ex,
+            HttpServletRequest request) {
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.FORBIDDEN,
+                "No tienes permisos para acceder a este recurso",
+                request.getRequestURI());
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(response);
+    }
+
+    /**
+     * Maneja AccessDeniedException (Spring Security legacy)
+     * Fallback para versiones anteriores de Spring Security o casos específicos
+     * 
+     * Contexto: Excepción estándar de acceso denegado
+     * También se lanza desde código personalizado de validación de ownership
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDeniedException(
+            AccessDeniedException ex,
+            HttpServletRequest request) {
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.FORBIDDEN,
+                "Acceso denegado. No tienes los permisos necesarios",
+                request.getRequestURI());
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(response);
+    }
+
+    /**
+     * Maneja AuthenticationException
+     * Se lanza cuando hay problemas con la autenticación
+     * 
+     * Contexto: Problemas con credenciales, tokens inválidos, sesión expirada
+     * Nota: JwtAuthenticationFilter ya maneja la mayoría de casos de tokens inválidos
+     */
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthenticationException(
+            AuthenticationException ex,
+            HttpServletRequest request) {
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.UNAUTHORIZED,
+                "Credenciales inválidas o sesión expirada",
+                request.getRequestURI());
+
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
                 .body(response);
     }
 

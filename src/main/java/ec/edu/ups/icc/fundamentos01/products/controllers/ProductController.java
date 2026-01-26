@@ -6,6 +6,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Slice;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 
@@ -23,6 +25,8 @@ import ec.edu.ups.icc.fundamentos01.products.dtos.UpdateProductDto;
 import ec.edu.ups.icc.fundamentos01.products.dtos.ProductResponseDto;
 
 import ec.edu.ups.icc.fundamentos01.products.services.ProductService;
+import ec.edu.ups.icc.fundamentos01.products.services.ProductServiceImpl;
+import ec.edu.ups.icc.fundamentos01.security.services.UserDetailsImpl;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -32,9 +36,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class ProductController {
 
     private final ProductService productService;
+    private final ProductServiceImpl productServiceImpl;
 
-    public ProductController(ProductService productService) {
+    public ProductController(ProductService productService, ProductServiceImpl productServiceImpl) {
         this.productService = productService;
+        this.productServiceImpl = productServiceImpl;
     }
 
     @PostMapping
@@ -48,6 +54,7 @@ public class ProductController {
      * Ejemplo: GET /api/products/all
      */
     @GetMapping("/all")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<ProductResponseDto>> findAll() {
         List<ProductResponseDto> products = productService.findAll();
         return ResponseEntity.ok(products);
@@ -152,17 +159,36 @@ public class ProductController {
         return ResponseEntity.ok(products);
     }
 
+    // ... otros endpoints (GET, POST, etc.)
+
+    /**
+     * Actualizar producto (solo dueño, ADMIN o MODERATOR)
+     * 
+     * El usuario autenticado se extrae del JWT mediante @AuthenticationPrincipal
+     * y se pasa al servicio para validar ownership
+     */
     @PutMapping("/{id}")
     public ResponseEntity<ProductResponseDto> update(
-            @PathVariable("id") Long id,
-            @Valid @RequestBody UpdateProductDto dto) {
-        ProductResponseDto updated = productService.update(id, dto);
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateProductDto dto,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {  // ← Usuario del JWT
+        
+        ProductResponseDto updated = productServiceImpl.update(id, dto, currentUser);
         return ResponseEntity.ok(updated);
     }
 
+    /**
+     * Eliminar producto (solo dueño, ADMIN o MODERATOR)
+     * 
+     * El usuario autenticado se extrae del JWT mediante @AuthenticationPrincipal
+     * y se pasa al servicio para validar ownership
+     */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable("id") Long id) {
-        productService.delete(id);
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {  // ← Usuario del JWT
+        
+        productServiceImpl.delete(id, currentUser);
         return ResponseEntity.noContent().build();
     }
 }

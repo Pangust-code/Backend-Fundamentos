@@ -10,7 +10,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import ec.edu.ups.icc.fundamentos01.categories.dtos.CategoryResponseDto;
 import ec.edu.ups.icc.fundamentos01.categories.entity.CategoryEntity;
@@ -20,11 +23,13 @@ import ec.edu.ups.icc.fundamentos01.exceptions.domain.NotFoundException;
 import ec.edu.ups.icc.fundamentos01.products.dtos.CreateProductDto;
 
 import ec.edu.ups.icc.fundamentos01.products.dtos.UpdateProductDto;
+import ec.edu.ups.icc.fundamentos01.products.mappers.ProductMapper;
 import ec.edu.ups.icc.fundamentos01.products.dtos.ProductResponseDto;
 
 import ec.edu.ups.icc.fundamentos01.products.models.Product;
 import ec.edu.ups.icc.fundamentos01.products.models.ProductEntity;
 import ec.edu.ups.icc.fundamentos01.products.repository.ProductRepository;
+import ec.edu.ups.icc.fundamentos01.security.services.UserDetailsImpl;
 import ec.edu.ups.icc.fundamentos01.users.models.UserEntity;
 import ec.edu.ups.icc.fundamentos01.users.repository.UserRepository;
 
@@ -43,6 +48,142 @@ public class ProductServiceImpl implements ProductService {
         this.productRepo = productRepo;
         this.categoryRepo = categoryRepository;
         this.userRepo = userRepo;
+    }
+
+        // ============== MÉTODOS DE CONSULTA ==============
+
+
+    // ============== MÉTODOS DE MODIFICACIÓN CON VALIDACIÓN DE OWNERSHIP ==============
+
+    /**
+     * Actualizar producto con validación de ownership
+     * 
+     * Validación:
+     * - Si eres ADMIN o MODERATOR → Puedes actualizar cualquier producto
+     * - Si eres USER → Solo puedes actualizar TUS productos
+     * 
+     * @param id ID del producto a actualizar
+     * @param dto Datos para actualizar
+     * @param currentUser Usuario autenticado (del JWT)
+     * @throws AccessDeniedException si no eres dueño ni tienes rol privilegiado
+     */
+    @Transactional
+    public ProductResponseDto update(Long id, UpdateProductDto dto, UserDetailsImpl currentUser) {
+
+
+        // 1. BUSCAR PRODUCTO EXISTENTE
+
+        ProductEntity product = findProductOrThrow(id);
+        // 2. VALIDACIÓN DE OWNERSHIP (pasando el usuario)
+        validateOwnership(product, currentUser);
+
+        // Si pasa la validación, actualizar
+        // 3. VALIDAR Y OBTENER CATEGORÍAS
+
+        Set<CategoryEntity> categories = validateAndGetCategories(dto.categoryIds);
+
+        // 4. ACTUALIZAR USANDO DOMINIO
+
+        Product productDomain = Product.fromEntity(product);
+        productDomain.update(dto);
+
+        // 5. CONVERTIR A ENTIDAD MANTENIENDO OWNER ORIGINAL
+
+        ProductEntity updated = productDomain.toEntity(product.getOwner(), categories);
+        updated.setId(id); // Asegurar que mantiene el ID
+        
+        // 6. PERSISTIR Y RESPONDER
+        ProductEntity saved = productRepo.save(updated);
+
+        return ProductMapper.toDto(saved);
+    }
+
+    /**
+     * Eliminar producto con validación de ownership
+     * 
+     * Validación:
+     * - Si eres ADMIN o MODERATOR → Puedes eliminar cualquier producto
+     * - Si eres USER → Solo puedes eliminar TUS productos
+     * 
+     * @param id ID del producto a eliminar
+     * @param currentUser Usuario autenticado (del JWT)
+     * @throws AccessDeniedException si no eres dueño ni tienes rol privilegiado
+     */
+    @Transactional
+    public void delete(Long id, UserDetailsImpl currentUser) {
+        ProductEntity product = findProductOrThrow(id);
+        
+        // ← VALIDACIÓN DE OWNERSHIP (pasando el usuario)
+        validateOwnership(product, currentUser);
+
+        // Si pasa la validación, eliminar
+        productRepo.delete(product);
+    }
+
+    // ============== MÉTODOS DE VALIDACIÓN Y UTILIDADES ==============
+
+    private ProductEntity findProductOrThrow(Long id) {
+        return productRepo.findById(id)
+                .orElseThrow(() -> new NotFoundException("Producto no encontrado con ID: " + id));
+    }
+
+    /**
+     * Valida si el usuario puede modificar/eliminar el producto
+     * 
+     * Lógica:
+     * 1. Si tiene ROLE_ADMIN → Puede modificar cualquier producto
+     * 2. Si tiene ROLE_MODERATOR → Puede modificar cualquier producto
+     * 3. Si es ROLE_USER → Solo puede modificar sus propios productos
+     * 
+     * @param product Producto a validar
+     * @param currentUser Usuario autenticado (del JWT)
+     * @throws AccessDeniedException si no tiene permisos
+     */
+    private void validateOwnership(ProductEntity product, UserDetailsImpl currentUser) {
+        // ADMIN y MODERATOR pueden modificar cualquier producto
+        if (hasAnyRole(currentUser, "ROLE_ADMIN", "ROLE_MODERATOR")) {
+            return;  // ← Pasa la validación automáticamente
+        }
+
+        // USER solo puede modificar sus propios productos
+        if (!product.getOwner().getId().equals(currentUser.getId())) {
+            // ← Lanza excepción que será capturada por GlobalExceptionHandler
+            throw new AccessDeniedException("No puedes modificar productos ajenos");
+        }
+
+        // Si llega aquí, es el dueño → Pasa la validación
+    }
+
+    /**
+     * Verifica si el usuario tiene alguno de los roles especificados
+     * 
+     * @param user Usuario a verificar
+     * @param roles Roles a buscar
+     * @return true si tiene al menos uno de los roles
+     */
+    private boolean hasAnyRole(UserDetailsImpl user, String... roles) {
+        for (String role : roles) {
+            for (GrantedAuthority authority : user.getAuthorities()) {
+                if (authority.getAuthority().equals(role)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+ 
+
+    /**
+     * Crea Pageable con ordenamiento dinámico
+     */
+    private Pageable createPageable(int page, int size, String[] sort) {
+        String sortField = sort[0];
+        Sort.Direction sortDirection = sort.length > 1 && sort[1].equalsIgnoreCase("desc")
+                ? Sort.Direction.DESC
+                : Sort.Direction.ASC;
+
+        return PageRequest.of(page, size, Sort.by(sortDirection, sortField));
     }
 
     @Override
@@ -204,55 +345,55 @@ public class ProductServiceImpl implements ProductService {
     }
 
     
-    private Pageable createPageable(int page, int size, String[] sort) {
-        // Validar parámetros
-        if (page < 0) {
-            throw new BadRequestException("La página debe ser mayor o igual a 0");
-        }
-        if (size < 1 || size > 100) {
-            throw new BadRequestException("El tamaño debe estar entre 1 y 100");
-        }
+    // private Pageable createPageable(int page, int size, String[] sort) {
+    //     // Validar parámetros
+    //     if (page < 0) {
+    //         throw new BadRequestException("La página debe ser mayor o igual a 0");
+    //     }
+    //     if (size < 1 || size > 100) {
+    //         throw new BadRequestException("El tamaño debe estar entre 1 y 100");
+    //     }
         
-        // Crear Sort
-        Sort sortObj = createSort(sort);
+    //     // Crear Sort
+    //     Sort sortObj = createSort(sort);
         
-        return PageRequest.of(page, size, sortObj);
-    }
+    //     return PageRequest.of(page, size, sortObj);
+    // }
 
-        private Sort createSort(String[] sort) {
-        if (sort == null || sort.length == 0) {
-            return Sort.by("id");
-        }
+        // private Sort createSort(String[] sort) {
+        // if (sort == null || sort.length == 0) {
+        //     return Sort.by("id");
+        // }
 
-        List<Sort.Order> orders = new ArrayList<>();
-        for (String sortParam : sort) {
-            String[] parts = sortParam.split(",");
-            String property = parts[0];
-            String direction = parts.length > 1 ? parts[1] : "asc";
+    //     List<Sort.Order> orders = new ArrayList<>();
+    //     for (String sortParam : sort) {
+    //         String[] parts = sortParam.split(",");
+    //         String property = parts[0];
+    //         String direction = parts.length > 1 ? parts[1] : "asc";
             
-            // Validar propiedades permitidas para evitar inyección SQL
-            if (!isValidSortProperty(property)) {
-                throw new BadRequestException("Propiedad de ordenamiento no válida: " + property);
-            }
+    //         // Validar propiedades permitidas para evitar inyección SQL
+    //         if (!isValidSortProperty(property)) {
+    //             throw new BadRequestException("Propiedad de ordenamiento no válida: " + property);
+    //         }
             
-            Sort.Order order = "desc".equalsIgnoreCase(direction) 
-                ? Sort.Order.desc(property)
-                : Sort.Order.asc(property);
+    //         Sort.Order order = "desc".equalsIgnoreCase(direction) 
+    //             ? Sort.Order.desc(property)
+    //             : Sort.Order.asc(property);
             
-            orders.add(order);
-        }
+    //         orders.add(order);
+    //     }
         
-        return Sort.by(orders);
-    }
+    //     return Sort.by(orders);
+    // }
 
-    private boolean isValidSortProperty(String property) {
-        // Lista blanca de propiedades permitidas para ordenamiento
-        Set<String> allowedProperties = Set.of(
-            "id", "name", "price", "createdAt", "updatedAt",
-            "owner.name", "owner.email", "category.name"
-        );
-        return allowedProperties.contains(property);
-    }
+    // private boolean isValidSortProperty(String property) {
+    //     // Lista blanca de propiedades permitidas para ordenamiento
+    //     Set<String> allowedProperties = Set.of(
+    //         "id", "name", "price", "createdAt", "updatedAt",
+    //         "owner.name", "owner.email", "category.name"
+    //     );
+    //     return allowedProperties.contains(property);
+    // }
 
     private void validateFilterParameters(Double minPrice, Double maxPrice) {
         if (minPrice != null && minPrice < 0) {
