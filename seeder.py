@@ -5,10 +5,10 @@ from datetime import datetime
 import bcrypt
 
 # ================= CONFIGURACIÓN =================
-DB_HOST = "localhost"
-DB_NAME = "devdb"
-DB_USER = "ups"
-DB_PASS = "ups123"
+DB_HOST = "ep-cold-queen-ahmlozce-pooler.c-3.us-east-1.aws.neon.tech"
+DB_NAME = "neondb"
+DB_USER = "neondb_owner"
+DB_PASS = "npg_U8JI7VguZFyt"
 DB_PORT = "5432"
 
 # Cantidad de datos
